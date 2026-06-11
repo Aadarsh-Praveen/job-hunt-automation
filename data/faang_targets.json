@@ -1,0 +1,37 @@
+{
+  "google": {
+    "apify_actor_id": "REPLACE_WITH_ACTOR_ID",
+    "search_url_template": "https://careers.google.com/jobs/results/?q={role}&location={location}",
+    "active": true
+  },
+  "meta": {
+    "apify_actor_id": "REPLACE_WITH_ACTOR_ID",
+    "search_url_template": "https://www.metacareers.com/jobs/?q={role}",
+    "active": true
+  },
+  "apple": {
+    "apify_actor_id": "REPLACE_WITH_ACTOR_ID",
+    "search_url_template": "https://jobs.apple.com/en-us/search?search={role}",
+    "active": true
+  },
+  "amazon": {
+    "apify_actor_id": "REPLACE_WITH_ACTOR_ID",
+    "search_url_template": "https://www.amazon.jobs/en/search?base_query={role}",
+    "active": true
+  },
+  "microsoft_workday": {
+    "apify_actor_id": "REPLACE_WITH_ACTOR_ID",
+    "tenant": "microsoft",
+    "active": true
+  },
+  "nvidia_workday": {
+    "apify_actor_id": "REPLACE_WITH_ACTOR_ID",
+    "tenant": "nvidia",
+    "active": true
+  },
+  "tesla_workday": {
+    "apify_actor_id": "REPLACE_WITH_ACTOR_ID",
+    "tenant": "tesla",
+    "active": true
+  }
+}

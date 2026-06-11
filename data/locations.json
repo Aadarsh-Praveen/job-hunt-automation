@@ -1,0 +1,26 @@
+{
+  "preferred": [
+    "Boston",
+    "Cambridge",
+    "New York",
+    "NYC",
+    "San Francisco",
+    "Bay Area",
+    "Remote",
+    "United States"
+  ],
+  "exclude": [
+    "London",
+    "Berlin",
+    "Bangalore",
+    "Singapore",
+    "Tokyo"
+  ],
+  "remote_keywords": [
+    "remote",
+    "fully remote",
+    "remote-first",
+    "work from anywhere",
+    "distributed"
+  ]
+}

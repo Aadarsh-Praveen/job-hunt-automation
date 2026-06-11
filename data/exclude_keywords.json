@@ -1,0 +1,20 @@
+{
+  "seniority_excludes": [
+    "Director",
+    "VP of",
+    "Vice President",
+    "Head of",
+    "Principal Engineer"
+  ],
+  "experience_excludes": [
+    "10+ years",
+    "12+ years",
+    "15+ years",
+    "minimum 8 years"
+  ],
+  "credential_excludes": [
+    "PhD required",
+    "Ph.D. required",
+    "doctorate required"
+  ]
+}

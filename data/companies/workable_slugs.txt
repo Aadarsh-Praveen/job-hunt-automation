@@ -1,0 +1,2 @@
+# Workable company slugs — one per line
+# Verify each at https://apply.workable.com/{slug}

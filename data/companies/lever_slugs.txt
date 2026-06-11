@@ -1,0 +1,13 @@
+# Lever company slugs — one per line, # for comments
+# Verify each by visiting https://jobs.lever.co/{slug}
+netflix
+mistral
+scale
+replicate
+modal
+baseten
+anyscale
+cresta
+glean
+harvey
+sierra

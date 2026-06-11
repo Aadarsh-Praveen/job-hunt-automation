@@ -1,0 +1,45 @@
+{
+  "include_titles": [
+    "Data Analyst",
+    "Data Scientist",
+    "AI Engineer",
+    "ML Engineer",
+    "Machine Learning Engineer",
+    "AI Developer",
+    "Gen AI Engineer",
+    "Generative AI Engineer",
+    "Applied Scientist",
+    "Applied AI Engineer",
+    "Research Engineer",
+    "MLOps Engineer",
+    "AI/ML Engineer",
+    "Data Engineer",
+    "AI Software Engineer"
+  ],
+  "include_keywords_any": [
+    "machine learning",
+    "deep learning",
+    "LLM",
+    "RAG",
+    "transformer",
+    "PyTorch",
+    "TensorFlow",
+    "data science",
+    "MLOps",
+    "vector database",
+    "agentic"
+  ],
+  "exclude_titles": [
+    "Senior Director",
+    "VP ",
+    "Principal",
+    "Staff "
+  ],
+  "exclude_keywords": [
+    "10+ years",
+    "15+ years",
+    "PhD required",
+    "security clearance",
+    "US citizen only"
+  ]
+}

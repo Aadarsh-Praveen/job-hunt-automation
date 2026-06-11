@@ -1,0 +1,22 @@
+# Greenhouse company slugs — one per line, # for comments
+# Verify each by visiting https://boards.greenhouse.io/{slug}
+anthropic
+stripe
+airbnb
+databricks
+notion
+figma
+doordash
+instacart
+robinhood
+brex
+ramp
+plaid
+gusto
+retool
+vercel
+hashicorp
+mongodb
+snowflake
+datadog
+gitlab

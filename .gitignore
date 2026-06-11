@@ -1,0 +1,55 @@
+# Secrets
+.env
+.env.local
+*.pem
+credentials.json
+token.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Local data / outputs
+logs/*.log
+logs/*.json
+resume/tailored/*.tex
+resume/tailored/*.pdf
+resume/tailored/*.md
+!resume/tailored/.gitkeep
+
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.toc
+*.fdb_latexmk
+*.fls
+*.synctex.gz
+
+# Notion exports
+notion_backups/
+
+# Cache
+.cache/
+*.cache

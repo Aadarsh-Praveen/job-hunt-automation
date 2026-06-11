@@ -1,0 +1,12 @@
+# Ashby company slugs — one per line, # for comments
+# Verify each by visiting https://jobs.ashbyhq.com/{slug}
+openai
+perplexity
+cohere
+character-ai
+elevenlabs
+decagon
+captions
+hex
+linear
+posthog
