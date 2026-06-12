@@ -1,0 +1,37 @@
+name: Fetch Jobs (Evening)
+
+on:
+  schedule:
+    # 23:00 UTC = 7:00 PM EDT / 6:00 PM EST.
+    - cron: '0 23 * * *'
+  workflow_dispatch:
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Set up Python 3.12
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Run fetcher
+        env:
+          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+          NOTION_PARENT_PAGE_ID: ${{ secrets.NOTION_PARENT_PAGE_ID }}
+          NOTION_APPLICATIONS_DB_ID: ${{ secrets.NOTION_APPLICATIONS_DB_ID }}
+          NOTION_CONTACTS_DB_ID: ${{ secrets.NOTION_CONTACTS_DB_ID }}
+          NOTION_COMPANIES_DB_ID: ${{ secrets.NOTION_COMPANIES_DB_ID }}
+          LOG_LEVEL: INFO
+        run: uv run python scripts/fetch_jobs.py
