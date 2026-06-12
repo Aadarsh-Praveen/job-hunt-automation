@@ -1,13 +1,7 @@
-# Lever company slugs — one per line, # for comments
-# Verify each by visiting https://jobs.lever.co/{slug}
+# Lever company slugs — verified working as of June 2026
+# How to find a new slug:
+#   1. Visit company's careers page
+#   2. URL will be https://jobs.lever.co/{slug}
 netflix
 mistral
-scale
-replicate
-modal
-baseten
 anyscale
-cresta
-glean
-harvey
-sierra

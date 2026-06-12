@@ -1,12 +1,11 @@
-# Ashby company slugs — one per line, # for comments
-# Verify each by visiting https://jobs.ashbyhq.com/{slug}
+# Ashby company slugs — verified working as of June 2026
+# How to find a new slug:
+#   1. Visit company's careers page
+#   2. URL will be https://jobs.ashbyhq.com/{slug}
 openai
 perplexity
 cohere
-character-ai
 elevenlabs
 decagon
-captions
-hex
 linear
 posthog
