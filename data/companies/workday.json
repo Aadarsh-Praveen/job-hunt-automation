@@ -1,0 +1,8 @@
+[
+  {"tenant": "nvidia",     "wd": 5, "site": "NVIDIAExternalCareerSite"},
+  {"tenant": "salesforce", "wd": 1, "site": "External_Career_Site"},
+  {"tenant": "adobe",      "wd": 5, "site": "external_experienced"},
+  {"tenant": "cisco",      "wd": 5, "site": "at_cisco"},
+  {"tenant": "workday",    "wd": 5, "site": "Workday"},
+  {"tenant": "servicenow", "wd": 1, "site": "ServiceNowCareers"}
+]

@@ -1,12 +1,12 @@
-name: Backup Notion (weekly)
+name: Auto-discover contacts (daily)
 
 on:
   schedule:
-    - cron: "0 4 * * 0"  # Sunday 4am UTC = Sat 11pm-ish ET
+    - cron: "0 14 * * 1-5"  # Mon-Fri 9am ET (14:00 UTC)
   workflow_dispatch:
 
 jobs:
-  backup:
+  discover:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,17 +20,10 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Run backup
+      - name: Discover contacts
         env:
           NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
           NOTION_APPLICATIONS_DB_ID: ${{ secrets.NOTION_APPLICATIONS_DB_ID }}
           NOTION_CONTACTS_DB_ID: ${{ secrets.NOTION_CONTACTS_DB_ID }}
-          NOTION_COMPANIES_DB_ID: ${{ secrets.NOTION_COMPANIES_DB_ID }}
-        run: uv run python scripts/backup_notion.py
-
-      - name: Upload backup artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: notion-backup-${{ github.run_id }}
-          path: data/backups/
-          retention-days: 90
+          HUNTER_API_KEY: ${{ secrets.HUNTER_API_KEY }}
+        run: uv run python scripts/auto_discover_contacts.py --apply

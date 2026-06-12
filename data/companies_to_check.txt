@@ -1,0 +1,78 @@
+# AI/ML — frontier labs & infrastructure
+Hugging Face
+Weights and Biases
+Pinecone
+Chroma
+Vellum
+Together AI
+Fireworks AI
+Modal
+Baseten
+Replicate
+Glean
+Harvey
+Sierra
+Cresta
+Hex
+Adept
+Inflection
+Imbue
+Sakana
+Codeium
+Cursor
+Tabnine
+Pylon
+Granola
+xAI
+Magic
+Liquid AI
+Reflection
+World Labs
+Robust Intelligence
+Galileo
+Patronus
+Distyl
+Hippocratic AI
+Crescendo
+Sana
+Synthesia
+Tavus
+Pika
+Runway
+Suno
+Character AI
+ElevenLabs
+Mistral
+Cohere
+
+# AI applications
+Notion
+Linear
+Vercel
+Retool
+Figma
+Airtable
+Monday
+Coda
+Loom
+ClickUp
+Zapier
+
+# Adjacent (data, infra)
+Snowflake
+Databricks
+Confluent
+Dremio
+Tecton
+Datadog
+Grafana
+LaunchDarkly
+PostHog
+Sentry
+
+# Finance/biz tools
+Brex
+Ramp
+Mercury
+Pulley
+Carta

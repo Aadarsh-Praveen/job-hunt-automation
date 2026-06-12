@@ -16,6 +16,7 @@ dependencies = [
     "google-api-python-client>=2.130.0",
     "tenacity>=8.4.0",
     "click>=8.1.7",
+    "openai>=2.41.1",
 ]
 
 [project.optional-dependencies]
