@@ -1,7 +1,0 @@
-# Lever company slugs — verified working as of June 2026
-# How to find a new slug:
-#   1. Visit company's careers page
-#   2. URL will be https://jobs.lever.co/{slug}
-netflix
-mistral
-anyscale
