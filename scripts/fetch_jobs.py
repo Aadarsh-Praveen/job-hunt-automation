@@ -3,7 +3,7 @@
 Pipeline:
     Phase 1 — Fetch from all ATS sources (Greenhouse / Lever / Ashby / Workable /
               Recruitee / Personio / Workday)
-    Phase 2 — Role filter
+    Phase 2 — Role filter (title + description keyword excludes)
     Phase 3 — Dedupe early (saves LLM credits)
     Phase 4 — LLM resolve empty locations (new jobs only)
     Phase 5 — Location filter
@@ -19,7 +19,12 @@ import re
 
 from src.common.llm_location import resolve_many
 from src.common.logger import get_logger
-from src.config import load_locations, load_role_keywords, load_slugs
+from src.config import (
+    load_exclude_keywords,
+    load_locations,
+    load_role_keywords,
+    load_slugs,
+)
 from src.fetchers.ashby import AshbyFetcher
 from src.fetchers.base import JobPosting
 from src.fetchers.greenhouse import GreenhouseFetcher
@@ -35,15 +40,49 @@ from src.tracker.writers import write_application
 logger = get_logger("fetch_jobs")
 
 
-def matches_role(job: JobPosting, kw: dict) -> bool:
+def matches_role(
+    job: JobPosting,
+    kw: dict,
+    exclude_kw: dict | None = None,
+) -> bool:
+    """Title + description-based role filter.
+
+    Title filters (always applied):
+      - include_titles + include_keywords_any (must match at least one)
+      - exclude_titles (must NOT match any)
+      - seniority_excludes from exclude_keywords.json — e.g. Director, VP, Head of
+
+    Description filters (only if description is populated):
+      - experience_excludes — e.g. '10+ years', '15+ years'
+      - credential_excludes — e.g. 'PhD required'
+    """
     title = job.role.lower()
+
     include = [t.lower() for t in kw.get("include_titles", [])]
     include += [k.lower() for k in kw.get("include_keywords_any", [])]
     if not any(term in title for term in include):
         return False
+
     exclude = [t.lower() for t in kw.get("exclude_titles", [])]
     if any(term in title for term in exclude):
         return False
+
+    if exclude_kw:
+        # Seniority — title-based
+        seniority = [t.lower() for t in exclude_kw.get("seniority_excludes", [])]
+        if any(term in title for term in seniority):
+            return False
+
+        # Experience + credential — description-based (only if we have body text)
+        description = (getattr(job, "description", None) or "").lower()
+        if description:
+            experience = [t.lower() for t in exclude_kw.get("experience_excludes", [])]
+            if any(term in description for term in experience):
+                return False
+            credential = [t.lower() for t in exclude_kw.get("credential_excludes", [])]
+            if any(term in description for term in credential):
+                return False
+
     return True
 
 
@@ -103,6 +142,7 @@ def _load_safely(ats_name: str) -> list:
 
 async def main(dry_run: bool = False) -> None:
     role_kw = load_role_keywords()
+    exclude_kw = load_exclude_keywords()
     loc_cfg = load_locations()
 
     # ---------- Phase 1: fetch ----------
@@ -125,7 +165,7 @@ async def main(dry_run: bool = False) -> None:
     all_jobs: list[JobPosting] = [j for sub in results for j in sub]
 
     # ---------- Phase 2: role filter ----------
-    role_matching = [j for j in all_jobs if matches_role(j, role_kw)]
+    role_matching = [j for j in all_jobs if matches_role(j, role_kw, exclude_kw)]
 
     # ---------- Phase 3: dedupe (early, saves LLM credits) ----------
     existing_hashes = await load_existing_hashes()

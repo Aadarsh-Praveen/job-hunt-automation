@@ -66,20 +66,25 @@ def get_settings() -> Settings:
     return Settings()
 
 
-def load_slugs(ats: str) -> list[str]:
-    """Load company slugs for one ATS from data/companies/{ats}_slugs.txt.
+def load_slugs(ats: str) -> list:
+    """Load company slugs for one ATS.
 
-    Comments (lines starting with #) and blank lines are ignored.
+    Prefers data/companies/{ats}.json (supports string slugs AND dict slugs
+    for Workday). Falls back to {ats}_slugs.txt for backward compat.
     """
-    path = DATA_DIR / "companies" / f"{ats}_slugs.txt"
-    if not path.exists():
+    json_path = DATA_DIR / "companies" / f"{ats}.json"
+    if json_path.exists():
+        return json.loads(json_path.read_text(encoding="utf-8"))
+
+    txt_path = DATA_DIR / "companies" / f"{ats}_slugs.txt"
+    if not txt_path.exists():
         return []
-    slugs = []
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if line and not line.startswith("#"):
-            slugs.append(line)
-    return slugs
+
+    return [
+        line.strip()
+        for line in txt_path.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.startswith("#")
+    ]
 
 
 @lru_cache(maxsize=1)
