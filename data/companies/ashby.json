@@ -1,9 +1,19 @@
 [
+  "cognition",
   "cohere",
   "decagon",
+  "Distyl",
   "elevenlabs",
+  "etched",
+  "fieldguide",
   "linear",
+  "noon-design",
+  "notion",
   "openai",
+  "percepta",
   "perplexity",
-  "posthog"
+  "posthog",
+  "ramp",
+  "st-labs",
+  "zapier"
 ]
