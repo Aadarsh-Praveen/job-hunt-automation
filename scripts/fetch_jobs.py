@@ -76,11 +76,20 @@ def matches_role(
     return True
 
 
-def matches_location(location: str, loc_cfg: dict) -> bool:
-    """Four-tier location filter — see locations.json for tier definitions."""
-    if not location:
-        return True
-    loc = location.lower()
+AMBIGUOUS_LOCATIONS = {"remote", "anywhere"}
+
+
+def matches_location(location: str, loc_cfg: dict) -> bool | None:
+    """Four-tier location filter — see locations.json for tier definitions.
+
+    Returns True (include), False (exclude), or None (ambiguous — caller
+    should defer to the LLM arbiter). Ambiguous: bare "Remote"/"Anywhere"
+    or an empty location string — not enough signal to decide from the
+    string alone, but not automatically excludable either.
+    """
+    loc = (location or "").strip().lower()
+    if not loc:
+        return None
 
     def matches_any(terms: list[str]) -> bool:
         for t in terms:
@@ -103,10 +112,12 @@ def matches_location(location: str, loc_cfg: dict) -> bool:
         return True
     if matches_any(loc_cfg.get("weak_allowed_substrings", [])):
         return True
+    if loc in AMBIGUOUS_LOCATIONS:
+        return None
     return False
 
 
-def job_to_application_row(job: JobPosting) -> ApplicationRow:
+def job_to_application_row(job: JobPosting, notes: str = "") -> ApplicationRow:
     return ApplicationRow(
         role=job.role,
         company=job.company,
@@ -118,6 +129,7 @@ def job_to_application_row(job: JobPosting) -> ApplicationRow:
         department=job.department,
         status="To Apply",
         dedupe_hash=job.dedupe_hash,
+        notes=notes,
     )
 
 
@@ -206,7 +218,51 @@ async def main(dry_run: bool = False) -> None:
                     llm_resolved_count += 1
 
     # ---------- Phase 5: location filter ----------
-    matching = [j for j in new_jobs if matches_location(j.location, loc_cfg)]
+    loc_verdicts = [(j, matches_location(j.location, loc_cfg)) for j in new_jobs]
+    matching = [j for j, v in loc_verdicts if v is True]
+    ambiguous_jobs = [j for j, v in loc_verdicts if v is None]
+
+    # Ambiguous locations (bare "Remote"/"Anywhere"/empty) can't be
+    # resolved from the string alone — defer to an LLM reading the JD
+    # body. UNCLEAR is treated as "include but flag", not "exclude" —
+    # the user reviews the Notion queue manually, so a real US-only job
+    # that just says "Remote" shouldn't get silently dropped.
+    arbiter_unclear_hashes: set[str] = set()
+    arbiter_excluded_count = 0
+    if ambiguous_jobs and os.environ.get("OPENAI_API_KEY"):
+        from src.common.llm_location_arbiter import arbitrate
+
+        oai_client = AsyncOpenAI()
+        sem = asyncio.Semaphore(10)
+
+        async def _arbitrate_one(job: JobPosting):
+            async with sem:
+                decision = await arbitrate(job.location, job.description, oai_client)
+                return job, decision
+
+        arbiter_results = await asyncio.gather(
+            *[_arbitrate_one(j) for j in ambiguous_jobs]
+        )
+        for job, decision in arbiter_results:
+            if decision.decision == "NON_US":
+                arbiter_excluded_count += 1
+                continue
+            matching.append(job)
+            if decision.decision == "UNCLEAR":
+                arbiter_unclear_hashes.add(job.dedupe_hash)
+        logger.info(
+            "phase_5_arbiter_complete",
+            ambiguous=len(ambiguous_jobs),
+            kept=len(ambiguous_jobs) - arbiter_excluded_count,
+            unclear_flagged=len(arbiter_unclear_hashes),
+            excluded_non_us=arbiter_excluded_count,
+        )
+    elif ambiguous_jobs:
+        logger.info(
+            "phase_5_arbiter_skipped",
+            reason="no_openai_key",
+            ambiguous=len(ambiguous_jobs),
+        )
 
     # ---------- Phase 6: LLM exclusion filter ----------
     llm_excluded_count = 0
@@ -227,6 +283,10 @@ async def main(dry_run: bool = False) -> None:
             f"\n  Raw fetched:           {len(all_jobs)}"
             f"\n  After role filter:     {len(role_matching)}"
             f"\n  New (after dedupe):    {len(new_jobs)}"
+            f"\n  Ambiguous locations:   {len(ambiguous_jobs)}"
+            f"  (kept {len(ambiguous_jobs) - arbiter_excluded_count}, "
+            f"of which {len(arbiter_unclear_hashes)} UNCLEAR; "
+            f"excluded {arbiter_excluded_count} NON_US)"
             f"\n  After loc filter:      {len(matching) + llm_excluded_count}"
             f"\n  After LLM filter:      {len(matching)}"
             f"\n  (LLM location resolution skipped in dry-run)\n"
@@ -240,8 +300,9 @@ async def main(dry_run: bool = False) -> None:
 
     written = failed = 0
     for job in matching:
+        notes = "location_verified: UNCLEAR" if job.dedupe_hash in arbiter_unclear_hashes else ""
         try:
-            await write_application(job_to_application_row(job))
+            await write_application(job_to_application_row(job, notes=notes))
             written += 1
         except Exception as e:
             logger.warning(
@@ -256,6 +317,10 @@ async def main(dry_run: bool = False) -> None:
     print(f"  After role filter:     {len(role_matching)}")
     print(f"  New (after dedupe):    {len(new_jobs)}")
     print(f"  LLM-resolved empties:  {llm_resolved_count}")
+    print(f"  Ambiguous locations:   {len(ambiguous_jobs)} "
+          f"(kept {len(ambiguous_jobs) - arbiter_excluded_count}, "
+          f"{len(arbiter_unclear_hashes)} UNCLEAR, "
+          f"excluded {arbiter_excluded_count} NON_US)")
     print(f"  After loc filter:      {len(matching) + llm_excluded_count}")
     print(f"  LLM-excluded:          {llm_excluded_count}")
     print(f"  New written:           {written}")

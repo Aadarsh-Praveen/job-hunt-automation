@@ -73,8 +73,16 @@
   ],
 
   "weak_allowed_substrings": [
-    "remote", "fully remote", "work from home", "wfh",
-    "anywhere", "telecommute", "distributed", "virtual"
+    "remote - us", "remote us", "us remote",
+    "remote - usa", "remote usa", "usa remote",
+    "remote - united states", "united states remote",
+    "remote (us)", "remote (usa)", "remote (united states)",
+    "remote, us", "remote, usa", "remote, united states",
+    "anywhere in the us", "anywhere in the usa",
+    "anywhere in united states",
+    "anywhere in the united states",
+    "remote - north america", "remote north america",
+    "us - remote", "usa - remote", "united states - remote"
   ],
 
   "blocked_substrings": [
@@ -129,6 +137,21 @@
     "edmonton", "ontario", "quebec", "british columbia",
     "alberta", "manitoba", "saskatchewan", "nova scotia",
     "new brunswick", "canada",
-    "emea", "apac", "latam", "mena", "asia pacific"
+    "emea", "apac", "latam", "mena", "asia pacific",
+
+    "north macedonia", "kosovo", "anz",
+    "europe", "european union", "eu remote", "remote - eu",
+    "remote - emea", "remote - apac", "remote - latam",
+    "remote - europe", "remote - asia",
+    "remote - global", "global - remote", "worldwide - remote",
+    "remote (europe)", "remote (asia)", "remote (emea)",
+    "remote (apac)", "remote (latam)",
+    "remote - india", "remote - canada", "remote - uk",
+    "remote - ireland", "remote - germany", "remote - france",
+    "remote - poland", "remote - spain",
+    "remote - brazil", "remote - argentina",
+    "remote - australia", "remote - japan",
+    "remote in europe", "remote in asia", "remote in emea",
+    "remote in canada", "remote in india", "remote in uk"
   ]
 }

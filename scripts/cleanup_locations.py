@@ -1,5 +1,11 @@
 """Cleanup: archive existing Notion Application rows whose location no longer passes the filter.
 
+Mirrors scripts/fetch_jobs.py::matches_location's four-tier logic exactly.
+Ambiguous rows (bare "Remote"/"Anywhere"/empty) get the same LLM arbiter
+treatment — JD fetched live via its URL (Notion doesn't store the full
+description), NON_US archived, UNCLEAR kept but flagged via the Notes
+field so it's visible in the Notion view.
+
 Usage:
     uv run python scripts/cleanup_locations.py            # dry-run, preview only
     uv run python scripts/cleanup_locations.py --apply    # actually archive
@@ -10,10 +16,15 @@ from __future__ import annotations
 import argparse
 import asyncio
 import os
+import re
 
 import httpx
 from dotenv import load_dotenv
+from openai import AsyncOpenAI
 
+from src.common.llm_location import HTTP_HEADERS as JD_HTTP_HEADERS
+from src.common.llm_location import fetch_jd_text
+from src.common.llm_location_arbiter import arbitrate
 from src.common.logger import get_logger
 from src.config import load_locations
 
@@ -28,15 +39,17 @@ HEADERS = {
     "Content-Type": "application/json",
 }
 
+AMBIGUOUS_LOCATIONS = {"remote", "anywhere"}
 
-import re
 
-def location_passes(location: str, loc_cfg: dict) -> bool:
-    """Mirrors scripts/fetch_jobs.py::matches_location — four-tier priority."""
-    if not location:
-        return True
+def location_passes(location: str, loc_cfg: dict) -> bool | None:
+    """Mirrors scripts/fetch_jobs.py::matches_location — four-tier priority.
 
-    loc = location.lower()
+    Returns True (keep), False (archive), or None (ambiguous — caller
+    should defer to the LLM arbiter)."""
+    loc = (location or "").strip().lower()
+    if not loc:
+        return None
 
     def matches_any(terms: list[str]) -> bool:
         for t in terms:
@@ -59,6 +72,8 @@ def location_passes(location: str, loc_cfg: dict) -> bool:
         return True
     if matches_any(loc_cfg.get("weak_allowed_substrings", [])):
         return True
+    if loc in AMBIGUOUS_LOCATIONS:
+        return None
     return False
 
 
@@ -77,6 +92,10 @@ def extract_company(prop: dict) -> str:
     if prop.get("relation"):
         return "(relation)"
     return ""
+
+
+def extract_url(prop: dict) -> str:
+    return prop.get("url") or ""
 
 
 async def query_all_applications(client: httpx.AsyncClient) -> list[dict]:
@@ -108,6 +127,14 @@ async def archive_page(client: httpx.AsyncClient, page_id: str) -> None:
     r.raise_for_status()
 
 
+async def update_notes(client: httpx.AsyncClient, page_id: str, notes: str) -> None:
+    r = await client.patch(
+        f"https://api.notion.com/v1/pages/{page_id}",
+        json={"properties": {"Notes": {"rich_text": [{"type": "text", "text": {"content": notes[:2000]}}]}}},
+    )
+    r.raise_for_status()
+
+
 async def main(apply: bool = False) -> None:
     loc_cfg = load_locations()
 
@@ -117,31 +144,83 @@ async def main(apply: bool = False) -> None:
         print(f"  Fetched {len(rows)} rows total\n")
 
         to_archive: list[dict] = []
+        ambiguous: list[dict] = []
         for row in rows:
             props = row.get("properties", {})
             location = extract_text(props.get("Location", {}), "rich_text")
-            if not location_passes(location, loc_cfg):
-                to_archive.append({
-                    "id": row["id"],
-                    "role": extract_text(props.get("Role", {}), "title"),
-                    "company": extract_company(props.get("Company", {})),
-                    "location": location,
-                })
+            item = {
+                "id": row["id"],
+                "role": extract_text(props.get("Role", {}), "title"),
+                "company": extract_company(props.get("Company", {})),
+                "location": location,
+                "jd_link": extract_url(props.get("JD Link", {})),
+            }
+            verdict = location_passes(location, loc_cfg)
+            if verdict is False:
+                to_archive.append(item)
+            elif verdict is None:
+                ambiguous.append(item)
 
-        if not to_archive:
-            print("Nothing to archive. Notion is clean already.\n")
+        # Ambiguous rows (bare "Remote"/"Anywhere"/empty) — fetch the JD
+        # and ask the LLM arbiter. NON_US -> archive. US_ONLY/UNCLEAR ->
+        # keep; UNCLEAR also gets a Notes marker so it's visible in the
+        # Notion view (same policy as scripts/fetch_jobs.py Phase 5).
+        to_flag_unclear: list[dict] = []
+        arbiter_kept = arbiter_excluded = 0
+        if ambiguous and os.environ.get("OPENAI_API_KEY"):
+            oai_client = AsyncOpenAI()
+            sem = asyncio.Semaphore(10)
+
+            async with httpx.AsyncClient(headers=JD_HTTP_HEADERS) as jd_client:
+
+                async def _arbitrate_one(item: dict) -> tuple[dict, str]:
+                    async with sem:
+                        jd_text = await fetch_jd_text(item["jd_link"], jd_client) if item["jd_link"] else ""
+                        decision = await arbitrate(item["location"], jd_text, oai_client)
+                        return item, decision.decision
+
+                results = await asyncio.gather(*[_arbitrate_one(i) for i in ambiguous])
+
+            for item, decision in results:
+                if decision == "NON_US":
+                    to_archive.append(item)
+                    arbiter_excluded += 1
+                else:
+                    arbiter_kept += 1
+                    if decision == "UNCLEAR":
+                        to_flag_unclear.append(item)
+        elif ambiguous:
+            print(
+                f"  {len(ambiguous)} ambiguous rows found but OPENAI_API_KEY "
+                f"is not set — skipping arbiter, leaving them as-is.\n"
+            )
+
+        print(
+            f"Ambiguous rows: {len(ambiguous)}  "
+            f"(arbiter kept {arbiter_kept}, of which {len(to_flag_unclear)} UNCLEAR; "
+            f"excluded {arbiter_excluded} NON_US)\n"
+        )
+
+        if not to_archive and not to_flag_unclear:
+            print("Nothing to archive or flag. Notion is clean already.\n")
             return
 
-        print(f"Would archive {len(to_archive)} rows. Sample:\n")
-        for item in to_archive[:25]:
-            print(f"  [{item['company']:15s}] {item['role'][:48]:48s} | {item['location']}")
-        if len(to_archive) > 25:
-            print(f"  ... and {len(to_archive) - 25} more\n")
+        if to_archive:
+            print(f"Would archive {len(to_archive)} rows. Sample:\n")
+            for item in to_archive[:25]:
+                print(f"  [{item['company']:15s}] {item['role'][:48]:48s} | {item['location']}")
+            if len(to_archive) > 25:
+                print(f"  ... and {len(to_archive) - 25} more\n")
+
+        if to_flag_unclear:
+            print(f"\nWould flag {len(to_flag_unclear)} UNCLEAR rows (Notes updated, not archived):\n")
+            for item in to_flag_unclear[:25]:
+                print(f"  [{item['company']:15s}] {item['role'][:48]:48s} | {item['location']}")
 
         if not apply:
             print(
-                f"\n[DRY RUN] Re-run with --apply to actually archive these "
-                f"{len(to_archive)} rows.\n"
+                f"\n[DRY RUN] Re-run with --apply to archive {len(to_archive)} rows "
+                f"and flag {len(to_flag_unclear)} UNCLEAR rows.\n"
             )
             return
 
@@ -162,13 +241,29 @@ async def main(apply: bool = False) -> None:
                 )
                 failed += 1
 
+        print(f"Flagging {len(to_flag_unclear)} UNCLEAR rows...")
+        flagged = flag_failed = 0
+        for item in to_flag_unclear:
+            try:
+                await update_notes(client, item["id"], "location_verified: UNCLEAR")
+                flagged += 1
+                await asyncio.sleep(0.35)
+            except Exception as e:
+                logger.warning(
+                    "flag_failed", page_id=item["id"], role=item["role"], error=str(e),
+                )
+                flag_failed += 1
+
         print("\n" + "=" * 72)
         print("  ✓ Cleanup complete")
         print("=" * 72)
         print(f"  Total rows scanned:  {len(rows)}")
         print(f"  Rows archived:       {archived}")
+        print(f"  Rows flagged UNCLEAR:{flagged:>4}")
         if failed:
-            print(f"  Failed:              {failed}  (see warnings above)")
+            print(f"  Archive failures:    {failed}  (see warnings above)")
+        if flag_failed:
+            print(f"  Flag failures:       {flag_failed}  (see warnings above)")
         print("=" * 72 + "\n")
 
 
