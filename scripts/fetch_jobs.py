@@ -7,7 +7,8 @@ Pipeline:
     Phase 3 — Dedupe early (saves LLM credits)
     Phase 4 — LLM resolve empty locations (new jobs only)
     Phase 5 — Location filter
-    Phase 6 — Write to Notion
+    Phase 6 — LLM exclusion filter (years/credentials/senior-level signals)
+    Phase 7 — Write to Notion
 """
 
 from __future__ import annotations
@@ -17,14 +18,20 @@ import asyncio
 import os
 import re
 
+from dotenv import load_dotenv
+from openai import AsyncOpenAI
+
+from src.common.llm_filter import batch_filter as llm_exclude_filter
 from src.common.llm_location import resolve_many
 from src.common.logger import get_logger
 from src.config import (
+    get_settings,
     load_exclude_keywords,
     load_locations,
     load_role_keywords,
     load_slugs,
 )
+from src.fetchers.apify_universal import ApifyUniversalFetcher
 from src.fetchers.ashby import AshbyFetcher
 from src.fetchers.base import JobPosting
 from src.fetchers.greenhouse import GreenhouseFetcher
@@ -37,6 +44,7 @@ from src.tracker.dedupe import load_existing_hashes
 from src.tracker.schemas import ApplicationRow
 from src.tracker.writers import write_application
 
+load_dotenv()
 logger = get_logger("fetch_jobs")
 
 
@@ -45,17 +53,9 @@ def matches_role(
     kw: dict,
     exclude_kw: dict | None = None,
 ) -> bool:
-    """Title + description-based role filter.
-
-    Title filters (always applied):
-      - include_titles + include_keywords_any (must match at least one)
-      - exclude_titles (must NOT match any)
-      - seniority_excludes from exclude_keywords.json — e.g. Director, VP, Head of
-
-    Description filters (only if description is populated):
-      - experience_excludes — e.g. '10+ years', '15+ years'
-      - credential_excludes — e.g. 'PhD required'
-    """
+    """Title-only pre-filter. Description-based excludes (years of experience,
+    PhD requirements, senior-level signals) are handled by the LLM filter in
+    Phase 6 — more reliable than substring matching."""
     title = job.role.lower()
 
     include = [t.lower() for t in kw.get("include_titles", [])]
@@ -68,20 +68,9 @@ def matches_role(
         return False
 
     if exclude_kw:
-        # Seniority — title-based
         seniority = [t.lower() for t in exclude_kw.get("seniority_excludes", [])]
         if any(term in title for term in seniority):
             return False
-
-        # Experience + credential — description-based (only if we have body text)
-        description = (getattr(job, "description", None) or "").lower()
-        if description:
-            experience = [t.lower() for t in exclude_kw.get("experience_excludes", [])]
-            if any(term in description for term in experience):
-                return False
-            credential = [t.lower() for t in exclude_kw.get("credential_excludes", [])]
-            if any(term in description for term in credential):
-                return False
 
     return True
 
@@ -164,6 +153,16 @@ async def main(dry_run: bool = False) -> None:
     results = await asyncio.gather(*[f.fetch_all() for f in fetchers])
     all_jobs: list[JobPosting] = [j for sub in results for j in sub]
 
+    # Apify universal — separate branch, doesn't fit BaseFetcher's
+    # per-slug fetch_one shape (one bulk call across curated presets).
+    settings = get_settings()
+    if os.getenv("SKIP_APIFY") != "1" and settings.apify_api_key and settings.apify_universal_actor_id:
+        apify_jobs = await ApifyUniversalFetcher().fetch_all()
+        all_jobs.extend(apify_jobs)
+        logger.info("apify_added", count=len(apify_jobs))
+    else:
+        logger.info("apify_skipped", reason="disabled_or_missing_config")
+
     # ---------- Phase 2: role filter ----------
     role_matching = [j for j in all_jobs if matches_role(j, role_kw, exclude_kw)]
 
@@ -194,18 +193,32 @@ async def main(dry_run: bool = False) -> None:
     # ---------- Phase 5: location filter ----------
     matching = [j for j in new_jobs if matches_location(j.location, loc_cfg)]
 
+    # ---------- Phase 6: LLM exclusion filter ----------
+    llm_excluded_count = 0
+    if matching and os.environ.get("OPENAI_API_KEY"):
+        oai_client = AsyncOpenAI()
+        before = len(matching)
+        matching = await llm_exclude_filter(matching, oai_client)
+        llm_excluded_count = before - len(matching)
+        logger.info(
+            "phase_6_llm_complete",
+            kept=len(matching),
+            excluded=llm_excluded_count,
+        )
+
     if dry_run:
         print(
             f"\n[DRY RUN]"
             f"\n  Raw fetched:           {len(all_jobs)}"
             f"\n  After role filter:     {len(role_matching)}"
             f"\n  New (after dedupe):    {len(new_jobs)}"
-            f"\n  After loc filter:      {len(matching)}"
-            f"\n  (LLM resolution skipped in dry-run)\n"
+            f"\n  After loc filter:      {len(matching) + llm_excluded_count}"
+            f"\n  After LLM filter:      {len(matching)}"
+            f"\n  (LLM location resolution skipped in dry-run)\n"
         )
         return
 
-    # ---------- Phase 6: write ----------
+    # ---------- Phase 7: write ----------
     if not matching:
         print("\nNo new jobs to write. Notion is up to date.\n")
         return
@@ -228,7 +241,8 @@ async def main(dry_run: bool = False) -> None:
     print(f"  After role filter:     {len(role_matching)}")
     print(f"  New (after dedupe):    {len(new_jobs)}")
     print(f"  LLM-resolved empties:  {llm_resolved_count}")
-    print(f"  After loc filter:      {len(matching)}")
+    print(f"  After loc filter:      {len(matching) + llm_excluded_count}")
+    print(f"  LLM-excluded:          {llm_excluded_count}")
     print(f"  New written:           {written}")
     if failed:
         print(f"  Failed writes:         {failed}")

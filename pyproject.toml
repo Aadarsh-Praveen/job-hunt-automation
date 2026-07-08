@@ -17,6 +17,7 @@ dependencies = [
     "tenacity>=8.4.0",
     "click>=8.1.7",
     "openai>=2.41.1",
+    "apify-client>=1.7.0",
 ]
 
 [project.optional-dependencies]

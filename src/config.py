@@ -30,9 +30,8 @@ class Settings(BaseSettings):
     notion_companies_db_id: str = ""
 
     # Apify
-    apify_token: str = ""
+    apify_api_key: str = ""
     apify_universal_actor_id: str = ""
-    apify_workday_actor_id: str = ""
 
     # Contact discovery
     apollo_api_key: str = ""

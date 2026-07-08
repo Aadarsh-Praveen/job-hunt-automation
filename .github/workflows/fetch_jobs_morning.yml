@@ -10,7 +10,7 @@ on:
 jobs:
   fetch:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
 
     steps:
       - name: Checkout repo
@@ -34,5 +34,8 @@ jobs:
           NOTION_APPLICATIONS_DB_ID: ${{ secrets.NOTION_APPLICATIONS_DB_ID }}
           NOTION_CONTACTS_DB_ID: ${{ secrets.NOTION_CONTACTS_DB_ID }}
           NOTION_COMPANIES_DB_ID: ${{ secrets.NOTION_COMPANIES_DB_ID }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          APIFY_API_KEY: ${{ secrets.APIFY_API_KEY }}
+          APIFY_UNIVERSAL_ACTOR_ID: ${{ secrets.APIFY_UNIVERSAL_ACTOR_ID }}
           LOG_LEVEL: INFO
         run: uv run python scripts/fetch_jobs.py

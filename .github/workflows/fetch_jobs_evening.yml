@@ -33,5 +33,7 @@ jobs:
           NOTION_APPLICATIONS_DB_ID: ${{ secrets.NOTION_APPLICATIONS_DB_ID }}
           NOTION_CONTACTS_DB_ID: ${{ secrets.NOTION_CONTACTS_DB_ID }}
           NOTION_COMPANIES_DB_ID: ${{ secrets.NOTION_COMPANIES_DB_ID }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          SKIP_APIFY: "1"
           LOG_LEVEL: INFO
         run: uv run python scripts/fetch_jobs.py
