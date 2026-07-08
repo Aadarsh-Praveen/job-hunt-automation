@@ -35,6 +35,7 @@ from src.fetchers.apify_universal import ApifyUniversalFetcher
 from src.fetchers.ashby import AshbyFetcher
 from src.fetchers.base import JobPosting
 from src.fetchers.greenhouse import GreenhouseFetcher
+from src.fetchers.jobspy_google import JobSpyGoogleFetcher
 from src.fetchers.lever import LeverFetcher
 from src.fetchers.personio import PersonioFetcher
 from src.fetchers.recruitee import RecruiteeFetcher
@@ -162,6 +163,20 @@ async def main(dry_run: bool = False) -> None:
         logger.info("apify_added", count=len(apify_jobs))
     else:
         logger.info("apify_skipped", reason="disabled_or_missing_config")
+
+    # JobSpy Google Jobs — best-effort, separate branch (bulk call per
+    # keyword, doesn't fit BaseFetcher). Google changes its job-search
+    # layout periodically and breaks the underlying scraper; this must
+    # never take the pipeline down with it.
+    if os.getenv("SKIP_JOBSPY") != "1":
+        try:
+            jobspy_jobs = await JobSpyGoogleFetcher().fetch_all()
+            all_jobs.extend(jobspy_jobs)
+            logger.info("jobspy_added", count=len(jobspy_jobs))
+        except Exception as e:  # noqa: BLE001
+            logger.warning("jobspy_failed", error=str(e))
+    else:
+        logger.info("jobspy_skipped")
 
     # ---------- Phase 2: role filter ----------
     role_matching = [j for j in all_jobs if matches_role(j, role_kw, exclude_kw)]

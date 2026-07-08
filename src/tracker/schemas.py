@@ -122,6 +122,7 @@ APPLICATIONS_SCHEMA: dict = {
                 {"name": "workday", "color": "red"},
                 {"name": "apify_universal", "color": "gray"},
                 {"name": "apify_faang", "color": "brown"},
+                {"name": "jobspy_google", "color": "teal"},
                 {"name": "indeed", "color": "default"},
                 {"name": "linkedin", "color": "default"},
                 {"name": "manual", "color": "default"},

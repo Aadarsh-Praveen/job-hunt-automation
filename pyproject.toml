@@ -19,6 +19,7 @@ dependencies = [
     "openai>=2.41.1",
     "apify-client>=1.7.0",
     "serpapi>=0.1.5",
+    "python-jobspy>=1.1.0",
 ]
 
 [project.optional-dependencies]
