@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     apify_api_key: str = ""
     apify_universal_actor_id: str = ""
 
+    # SerpAPI (slug discovery)
+    serpapi_api_key: str = ""
+
     # Contact discovery
     apollo_api_key: str = ""
     hunter_api_key: str = ""
