@@ -127,6 +127,11 @@ def job_to_application_row(job: JobPosting, notes: str = "") -> ApplicationRow:
         date_discovered=job.date_discovered,
         location=job.location,
         department=job.department,
+        # 1900 not 2000 — Notion's rich_text limit is measured in UTF-16
+        # code units, not Python's len(); a small margin avoids 400s from
+        # wide Unicode chars in scraped JD text (confirmed live in the
+        # backfill script, see scripts/backfill_description.py).
+        description=(job.description or "")[:1900],
         status="To Apply",
         dedupe_hash=job.dedupe_hash,
         notes=notes,

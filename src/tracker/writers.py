@@ -10,10 +10,28 @@ from datetime import datetime
 
 from src.common.logger import get_logger
 from src.config import get_settings
-from src.tracker.notion_client import create_page
+from src.tracker.notion_client import create_page, get_database_properties
 from src.tracker.schemas import ApplicationRow
 
 logger = get_logger("tracker.writers")
+
+# Cached per database_id — checked once per process, not once per write.
+# "Description" is optional (added after this codebase already had writers
+# without it); Notion rejects the ENTIRE page-create payload if it
+# references a property the database doesn't have, so this must be
+# checked before adding the key, not discovered via a failed write.
+_optional_columns_cache: dict[str, set[str]] = {}
+
+
+async def _has_column(database_id: str, column: str) -> bool:
+    if database_id not in _optional_columns_cache:
+        try:
+            props = await get_database_properties(database_id)
+            _optional_columns_cache[database_id] = set(props.keys())
+        except Exception as e:  # noqa: BLE001
+            logger.warning("notion_schema_check_failed", error=str(e))
+            return False
+    return column in _optional_columns_cache[database_id]
 
 
 # ---------------------------------------------------------------------------
@@ -86,5 +104,15 @@ async def write_application(row: ApplicationRow) -> dict:
         raise RuntimeError("NOTION_APPLICATIONS_DB_ID not set in .env")
 
     properties = application_to_notion(row)
-    page = await create_page(settings.notion_applications_db_id, properties)
+
+    db_id = settings.notion_applications_db_id
+    if await _has_column(db_id, "Description"):
+        properties["Description"] = _rich_text(row.description)
+    else:
+        logger.warning(
+            "notion_description_column_missing",
+            detail="add a 'Description' rich_text column to Notion to persist JD text",
+        )
+
+    page = await create_page(db_id, properties)
     return page

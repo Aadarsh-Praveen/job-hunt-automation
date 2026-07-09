@@ -71,6 +71,7 @@ class ApplicationRow(BaseModel):
     status: ApplicationStatus = "To Apply"
     location: str = ""
     department: str = ""
+    description: str = ""
     notes: str = ""
     dedupe_hash: str
 
@@ -154,6 +155,7 @@ APPLICATIONS_SCHEMA: dict = {
     },
     "Location": {"rich_text": {}},
     "Department": {"rich_text": {}},
+    "Description": {"rich_text": {}},
     "Notes": {"rich_text": {}},
     "Dedupe Hash": {"rich_text": {}},
 }

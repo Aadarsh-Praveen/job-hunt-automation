@@ -86,6 +86,20 @@ async def query_database(
     return results
 
 
+async def get_database_properties(database_id: str) -> dict:
+    """Return the {property_name: property_schema} dict for a database.
+
+    Used to check whether an optional column exists before writing to it —
+    Notion rejects the entire page-create/update payload if it references
+    an unknown property, so this check must happen before, not after.
+    """
+    url = f"{NOTION_API_BASE}/databases/{database_id}"
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.get(url, headers=_headers())
+        resp.raise_for_status()
+        return resp.json().get("properties", {})
+
+
 async def create_page(database_id: str, properties: dict) -> dict:
     """Create a new page (row) in a database."""
     url = f"{NOTION_API_BASE}/pages"

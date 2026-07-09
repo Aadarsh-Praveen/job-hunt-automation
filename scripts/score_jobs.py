@@ -145,12 +145,19 @@ async def score_row(
         props = row.get("properties", {})
         role = extract_text(props.get("Role", {}), "title")
         company = extract_company(props.get("Company", {}))
-        jd_url = extract_url(props.get("JD Link", {}))
 
-        if not jd_url:
-            return None
+        # Notion-stored description first (instant, no HTTP) — only rows
+        # written before the Description column existed fall through to
+        # a live URL fetch, which fails for bot-protected sites/SPAs.
+        description = extract_text(props.get("Description", {}), "rich_text")
+        source = "notion" if description else ""
 
-        description = await fetch_jd_text(jd_url, web)
+        if not description:
+            jd_url = extract_url(props.get("JD Link", {}))
+            if jd_url:
+                description = await fetch_jd_text(jd_url, web)
+                source = "url_fetch" if description else ""
+
         if not description:
             return None
 
@@ -163,6 +170,7 @@ async def score_row(
             "role": role,
             "company": company,
             "score": score,
+            "source": source,
         }
 
 
@@ -273,11 +281,16 @@ async def main(apply: bool = False, limit: int | None = None) -> None:
             sum(r["score"].fit_score for r in results) / len(results) if results else 0
         )
 
+        from_notion = sum(1 for r in results if r["source"] == "notion")
+        from_url = sum(1 for r in results if r["source"] == "url_fetch")
+
         logger.info(
             "scoring_complete",
             total=len(rows),
             scored=scored,
             failed=failed,
+            from_notion=from_notion,
+            from_url_fetch=from_url,
             duration_s=round(duration_s, 1),
             avg_score=round(avg_score, 1),
         )
@@ -285,6 +298,10 @@ async def main(apply: bool = False, limit: int | None = None) -> None:
         results.sort(key=lambda r: r["score"].fit_score, reverse=True)
 
         if not apply:
+            print(
+                f"Description source: {from_notion} from Notion, "
+                f"{from_url} from live URL fetch\n"
+            )
             print(f"Top {min(20, len(results))} by fit score:\n")
             for r in results[:20]:
                 s = r["score"]
@@ -320,7 +337,7 @@ async def main(apply: bool = False, limit: int | None = None) -> None:
         print("  ✓ Scoring complete")
         print("=" * 72)
         print(f"  Total rows scanned:  {len(rows)}")
-        print(f"  Scored:              {scored}")
+        print(f"  Scored:              {scored}  ({from_notion} from Notion, {from_url} from URL fetch)")
         print(f"  Written to Notion:   {written}")
         print(f"  Failed to score:     {failed}  (missing JD / fetch / LLM error)")
         if write_failed:
