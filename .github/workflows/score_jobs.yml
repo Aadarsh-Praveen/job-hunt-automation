@@ -1,0 +1,33 @@
+name: Score jobs
+
+on:
+  schedule:
+    - cron: "30 11 * * *"  # 30 min after morning fetch (11:30 UTC / 7:30am ET)
+    - cron: "30 23 * * *"  # 30 min after evening fetch (23:30 UTC / 7:30pm ET)
+  workflow_dispatch: {}
+
+jobs:
+  score:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Set up Python 3.12
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Score jobs
+        env:
+          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+          NOTION_APPLICATIONS_DB_ID: ${{ secrets.NOTION_APPLICATIONS_DB_ID }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          LOG_LEVEL: INFO
+        run: uv run python scripts/score_jobs.py --apply
