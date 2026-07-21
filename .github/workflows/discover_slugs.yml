@@ -5,6 +5,9 @@ on:
     - cron: "0 2 * * 0"  # Sunday 2am UTC — before the Sunday 4am UTC backup
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   discover:
     runs-on: ubuntu-latest
